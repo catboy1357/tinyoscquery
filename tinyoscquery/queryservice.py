@@ -1,3 +1,4 @@
+from typing import Any, Type
 from zeroconf import ServiceInfo, Zeroconf
 from http.server import SimpleHTTPRequestHandler, HTTPServer
 from .shared.node import OSCQueryNode, OSCHostInfo, OSCAccess
@@ -18,7 +19,7 @@ class OSCQueryService(object):
         Desired UDP port number for the osc server
     """
     
-    def __init__(self, serverName, httpPort, oscPort, oscIp="127.0.0.1") -> None:
+    def __init__(self, serverName: str, httpPort: int, oscPort: int, oscIp="127.0.0.1") -> None:
         self.serverName = serverName
         self.httpPort = httpPort
         self.oscPort = oscPort
@@ -35,13 +36,33 @@ class OSCQueryService(object):
         self.http_thread = threading.Thread(target=self._startHTTPServer)
         self.http_thread.start()
 
-    def __del__(self):
+    def __del__(self) -> None:
         self._zeroconf.unregister_all_services()
 
-    def add_node(self, node):
+    def add_node(self, node: OSCQueryNode) -> None:
+        """
+        Add a node to the OSCQueryService.
+
+        Attributes
+        ----------
+        node : OSCQueryNode
+            The node to be added
+        """
         self.root_node.add_child_node(node)
 
-    def advertise_endpoint(self, address, value=None, access=OSCAccess.READWRITE_VALUE):
+    def advertise_endpoint(self, address: str, value: list[Any]|Any = None, access:OSCAccess = OSCAccess.READWRITE_VALUE) -> None:
+        """
+        Advertise an endpoint with a given address and optional value.
+
+        Attributes
+        ----------
+        address : str
+            The address of the endpoint.
+        value : Any, optional
+            The value of the endpoint. represents one or multiple values (default: None).
+        access : OSCAccess, optional
+            The access level of the endpoint (default: READWRITE_VALUE).
+        """
         new_node = OSCQueryNode(full_path=address, access=access)
         if value is not None:
             if not isinstance(value, list):
@@ -52,17 +73,17 @@ class OSCQueryService(object):
                 new_node.type_ = [type(v) for v in value]
         self.add_node(new_node)
 
-    def _startOSCQueryService(self):
+    def _startOSCQueryService(self) -> None:
         oscqsDesc = {'txtvers': 1}
         oscqsInfo = ServiceInfo("_oscjson._tcp.local.", "%s._oscjson._tcp.local." % self.serverName, self.httpPort, 
         0, 0, oscqsDesc, "%s.oscjson.local." % self.serverName, addresses=["127.0.0.1"])
         self._zeroconf.register_service(oscqsInfo)
 
 
-    def _startHTTPServer(self):
+    def _startHTTPServer(self) -> None:
         self.http_server.serve_forever()
 
-    def _advertiseOSCService(self):
+    def _advertiseOSCService(self) -> None:
         oscDesc = {'txtvers': 1}
         oscInfo = ServiceInfo("_osc._udp.local.", "%s._osc._udp.local." % self.serverName, self.oscPort, 
         0, 0, oscDesc, "%s.osc.local." % self.serverName, addresses=["127.0.0.1"])
@@ -71,14 +92,46 @@ class OSCQueryService(object):
 
 
 class OSCQueryHTTPServer(HTTPServer):
-    def __init__(self, root_node, host_info, server_address: tuple[str, int], RequestHandlerClass, bind_and_activate: bool = ...) -> None:
+    """
+    Custom HTTP server for OSCQuery service.
+    
+    Attributes
+    ----------
+    root_node : OSCQueryNode
+        The root node of the OSCQuery service.
+    host_info : OSCHostInfo
+        Information about the host.
+    server_address : tuple[str, int]
+        A tuple containing the IP address and port number.
+    RequestHandlerClass : Type[SimpleHTTPRequestHandler]
+        The class to handle incoming requests.
+    bind_and_activate : bool
+        A boolean indicating whether to bind and activate the server.
+    """
+    def __init__(
+        self,
+        root_node: OSCQueryNode,
+        host_info: OSCHostInfo,
+        server_address: tuple[str, int], 
+        RequestHandlerClass: Type[SimpleHTTPRequestHandler],
+        bind_and_activate: bool = True
+    ) -> None:
+
         super().__init__(server_address, RequestHandlerClass, bind_and_activate)
         self.root_node = root_node
         self.host_info = host_info
 
 
 class OSCQueryHTTPHandler(SimpleHTTPRequestHandler):
+    """HTTP request handler for OSCQuery service."""
+
     def do_GET(self) -> None:
+        """
+        Handle GET requests.
+        If the requested path is 'HOST_INFO', returns host information as JSON.
+        If the requested path is a valid OSCQuery node, returns node information as JSON.
+        Otherwise, returns a 404 error.
+        """
         if 'HOST_INFO' in self.path:
             self.send_response(200)
             self.send_header("Content-type", "text/json")
@@ -97,6 +150,7 @@ class OSCQueryHTTPHandler(SimpleHTTPRequestHandler):
             self.end_headers()
             self.wfile.write(bytes(str(node.to_json()), 'utf-8'))
 
-    def log_message(self, format, *args):
+    def log_message(self, format: str, *args) -> None:
+        """Override default log message behavior."""
         pass
             
