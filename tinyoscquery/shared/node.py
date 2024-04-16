@@ -79,7 +79,7 @@ class OSCQueryNode():
 
         path_split = child.full_path.rsplit("/",1)
         if len(path_split) < 2:
-            raise Exception("Tried to add child node with invalid full path!")
+            raise NodeError("Tried to add child node with invalid full path!", path=path_split)
 
         parent_path = path_split[0]
 
@@ -110,6 +110,17 @@ class OSCQueryNode():
 
     def __str__(self) -> str:
         return f'<OSCQueryNode @ {self.full_path} (D: "{self.description}" T:{self.type_} V:{self.value})>'
+
+class NodeError(ValueError):
+    def __init__(self, *args, **kwargs):
+        self.path = kwargs.pop('path', None)
+        super().__init__(*args, **kwargs)
+    
+    def __str__(self):
+        msg = super().__str__()
+        if self.path is not None:
+            msg += f' "{self.path}"'
+        return msg
 
 class OSCHostInfo():
     def __init__(self, name, extensions, osc_ip=None, osc_port=None, osc_transport=None, ws_ip=None, ws_port=None) -> None:
