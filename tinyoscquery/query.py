@@ -69,10 +69,10 @@ class OSCQueryBrowser(object):
 class OSCQueryClient(object):
     def __init__(self, service_info) -> None:
         if not isinstance(service_info, ServiceInfo):
-            raise Exception("service_info isn't a ServiceInfo class!")
+            raise TypeError("service_info isn't a ServiceInfo class!")
 
         if service_info.type != "_oscjson._tcp.local.":
-            raise Exception("service_info does not represent an OSCQuery service!")
+            raise ValueError("service_info does not represent an OSCQuery service!")
 
         self.service_info = service_info
         self.last_json = None
@@ -98,7 +98,7 @@ class OSCQueryClient(object):
             return None
         
         if r.status_code != 200:
-            raise Exception("Node query error: (HTTP", r.status_code, ") ", r.content)
+            raise requests.HTTPError(f"Node query error: (HTTP {r.status_code}) {r.content}")
 
         self.last_json = r.json()
 
@@ -117,7 +117,7 @@ class OSCQueryClient(object):
             return None
 
         if r.status_code != 200:
-            raise Exception("Node query error: (HTTP", r.status_code, ") ", r.content)
+            raise requests.HTTPError(f"Node query error: (HTTP {r.status_code}) {r.content}")
 
         json = r.json()
         hi = OSCHostInfo(json["NAME"], json['EXTENSIONS'])
@@ -164,7 +164,7 @@ class OSCQueryClient(object):
             newNode.value = []
             # This should always be an array... throw an exception here?
             if not isinstance(json['VALUE'], list):
-                raise Exception("OSCQuery JSON Value is not List / Array? Out-of-spec?")
+                raise ValueError("OSCQuery JSON Value is not List / Array? Out-of-spec?")
             
             for idx, v in enumerate(json["VALUE"]):
                 # According to the spec, if there is not yet a value, the return will be an empty JSON object

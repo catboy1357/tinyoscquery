@@ -142,7 +142,7 @@ def OSC_Type_String_to_Python_Type(typestr):
         elif typevalue == "s":
             types.append(str)
         else:
-            raise Exception(f"Unknown OSC type when converting! {typevalue} -> ???")
+            raise ValueError(f"Unknown OSC type when converting! {typevalue} -> ???")
 
 
     return types
@@ -160,7 +160,7 @@ def Python_Type_List_to_OSC_Type(types_):
         elif type_ == str:
             output.append("s")
         else:
-            raise Exception(f"Cannot convert {type_} to OSC type!")
+            raise ValueError(f"Cannot convert {type_} to OSC type!")
 
     return " ".join(output)
 
