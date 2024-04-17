@@ -8,6 +8,14 @@ import json, threading
 class OSCQueryService(object):
     """
     A class providing an OSCQuery service. Automatically sets up a oscjson http server and advertises the oscjson server and osc server on zeroconf.
+    
+    Description
+    -----------
+    OSCQueryService is a class designed to facilitate an OSCQuery service.
+    It automatically sets up an oscjson HTTP server and advertises the oscjson
+    server and osc server on zeroconf. This class allows adding nodes to the 
+    OSCQueryService and advertising endpoints with given addresses and optional values.
+
 
     Attributes
     ----------
@@ -43,7 +51,7 @@ class OSCQueryService(object):
         """
         Add a node to the OSCQueryService.
 
-        Attributes
+        Parameters
         ----------
         node : OSCQueryNode
             The node to be added
@@ -54,7 +62,7 @@ class OSCQueryService(object):
         """
         Advertise an endpoint with a given address and optional value.
 
-        Attributes
+        Parameters
         ----------
         address : str
             The address of the endpoint.
@@ -74,6 +82,7 @@ class OSCQueryService(object):
         self.add_node(new_node)
 
     def _startOSCQueryService(self) -> None:
+        """Starts the OSCQuery service by registering OSCQuery service information."""
         oscqsDesc = {'txtvers': 1}
         oscqsInfo = ServiceInfo("_oscjson._tcp.local.", "%s._oscjson._tcp.local." % self.serverName, self.httpPort, 
         0, 0, oscqsDesc, "%s.oscjson.local." % self.serverName, addresses=["127.0.0.1"])
@@ -81,9 +90,11 @@ class OSCQueryService(object):
 
 
     def _startHTTPServer(self) -> None:
+        """Starts the HTTP server by serving requests forever."""
         self.http_server.serve_forever()
 
     def _advertiseOSCService(self) -> None:
+        """Advertises the OSC service by registering OSC service information."""
         oscDesc = {'txtvers': 1}
         oscInfo = ServiceInfo("_osc._udp.local.", "%s._osc._udp.local." % self.serverName, self.oscPort, 
         0, 0, oscDesc, "%s.osc.local." % self.serverName, addresses=["127.0.0.1"])

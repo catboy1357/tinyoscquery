@@ -1,11 +1,13 @@
 import socket
 
-def get_open_tcp_port():
+def get_open_tcp_port() -> int:
     '''
-    Returns a valid, open, TCP port.
+    Finds a valid, open, TCP port.
 
-        Returns:
-            port (int): A TCP port that is able to be bound to
+    Returns
+    -------
+    port : int
+        A TCP port that is able to be bound to
     '''
     s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     s.bind(("", 0))
@@ -13,12 +15,14 @@ def get_open_tcp_port():
     s.close()
     return port
 
-def get_open_udp_port():
+def get_open_udp_port() -> int:
     '''
-    Returns a valid, open, UDP port.
+    Finds a valid, open, UDP port.
 
-        Returns:
-            port (int): A UDP port that is able to be bound to
+    Returns
+    -------
+    port : int
+        A UDP port that is able to be bound to
     '''
     s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     s.bind(("", 0))
