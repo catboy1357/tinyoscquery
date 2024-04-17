@@ -41,9 +41,9 @@ class OSCNodeEncoder(JSONEncoder):
                     obj_dict["TYPE"] = Python_Type_List_to_OSC_Type(v)
                 if k == "contents":
                     obj_dict["CONTENTS"] = {}
-                    for subNode in v:
-                        if subNode.full_path is not None:
-                            obj_dict["CONTENTS"][subNode.full_path.split("/")[-1]] = subNode
+                    for sub_node in v:
+                        if sub_node.full_path is not None:
+                            obj_dict["CONTENTS"][sub_node.full_path.split("/")[-1]] = sub_node
                         else:
                             continue
                 else:
@@ -65,7 +65,7 @@ class OSCNodeEncoder(JSONEncoder):
                     continue
                 obj_dict[k.upper()] = v
             return obj_dict
-        
+
         return json.JSONEncoder.default(self, o)
 
 class OSCAccess(IntEnum):
@@ -137,16 +137,16 @@ class OSCQueryNode():
         if self.full_path == full_path:
             return self
 
-        foundNode = None
+        found_node = None
         if self.contents is None:
             return None
-        
-        for subNode in self.contents:
-            foundNode = subNode.find_subnode(full_path)
-            if foundNode is not None:
+
+        for sub_node in self.contents:
+            found_node = sub_node.find_subnode(full_path)
+            if found_node is not None:
                 break
 
-        return foundNode
+        return found_node
 
     def add_child_node(self, child: 'OSCQueryNode') -> None:
         """
@@ -175,13 +175,12 @@ class OSCQueryNode():
         if parent is None:
             parent = OSCQueryNode(parent_path)
             self.add_child_node(parent)
-            
-        
+
         if parent.contents is None:
             parent.contents = []
         parent.contents.append(child)
 
-    
+
     def to_json(self) -> dict[str, Any]:
         """Converts the node and its contents to a JSON string."""
         return json.dumps(self, cls=OSCNodeEncoder)
@@ -198,8 +197,8 @@ class OSCQueryNode():
         """
         yield self
         if self.contents is not None:
-            for subNode in self.contents:
-                yield from subNode
+            for sub_node in self.contents:
+                yield from sub_node
 
     def __str__(self) -> str:
         """
@@ -209,7 +208,10 @@ class OSCQueryNode():
         - T - Type
         - V - Value
         """
-        return f'<OSCQueryNode @ {self.full_path} (D: "{self.description}" T:{self.type_} V:{self.value})>'
+        return_str = f'<OSCQueryNode @ {self.full_path} '
+        return_str += f'(D: "{self.description}" '
+        return_str += f'T:{self.type_} V:{self.value})>'
+        return return_str
 
 class NodeError(ValueError):
     """
@@ -223,7 +225,7 @@ class NodeError(ValueError):
     def __init__(self, *args, **kwargs) -> None:
         self.path = kwargs.pop('path', None)
         super().__init__(*args, **kwargs)
-    
+
     def __str__(self) -> str:
         msg = super().__str__()
         # Add kwargs to the return message
@@ -278,6 +280,7 @@ class OSCHostInfo():
         """Converts the OSCHostInfo object to a JSON string."""
         return json.dumps(self, cls=OSCNodeEncoder)
 
+
 def OSC_Type_String_to_Python_Type(typestr: str) -> List[type]:
     """
     Convert an OSC type string to a list of corresponding Python types.
@@ -308,7 +311,6 @@ def OSC_Type_String_to_Python_Type(typestr: str) -> List[type]:
             types.append(str)
         else:
             raise ValueError(f"Unknown OSC type when converting! {typevalue} -> ???")
-
 
     return types
 

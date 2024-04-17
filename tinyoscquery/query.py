@@ -91,7 +91,9 @@ class OSCQueryBrowser(object):
     def __init__(self) -> None:
         self.listener = OSCQueryListener()
         self.zc = Zeroconf()
-        self.browser = ServiceBrowser(self.zc, ["_oscjson._tcp.local.", "_osc._udp.local."], self.listener)
+        self.browser = ServiceBrowser(
+            self.zc, ["_oscjson._tcp.local.", "_osc._udp.local."], self.listener
+        )
 
     def get_discovered_osc(self) -> list[ServiceInfo]:
         """
@@ -130,13 +132,15 @@ class OSCQueryBrowser(object):
             The discovered service information, if found. Otherwise, returns None.
         """
         for svc in self.get_discovered_oscquery():
-            client = OSCQueryClient(svc)
-            if name in client.get_host_info().name:
+            client_ = OSCQueryClient(svc)
+            if name in client_.get_host_info().name:
                 return svc
 
         return None
 
-    def find_nodes_by_endpoint_address(self, address: str) -> list[tuple[ServiceInfo, OSCHostInfo, OSCQueryNode]]:
+    def find_nodes_by_endpoint_address(
+            self, address: str
+        ) -> list[tuple[ServiceInfo, OSCHostInfo, OSCQueryNode]]:
         """
         Finds nodes by their endpoint address.
 
@@ -152,13 +156,13 @@ class OSCQueryBrowser(object):
         """
         svcs = []
         for svc in self.get_discovered_oscquery():
-            client = OSCQueryClient(svc)
-            hi = client.get_host_info()
+            client_ = OSCQueryClient(svc)
+            hi = client_.get_host_info()
             if hi is None:
                 continue
-            node = client.query_node(address)
-            if node is not None:
-                svcs.append((svc, hi, node))
+            node_ = client_.query_node(address)
+            if node_ is not None:
+                svcs.append((svc, hi, node_))
 
         return svcs
 
@@ -179,14 +183,14 @@ class OSCQueryClient(object):
     service_info: ServiceInfo
         Information about the OSCQuery service.
     """
-    def __init__(self, service_info: ServiceInfo) -> None:
-        if not isinstance(service_info, ServiceInfo):
+    def __init__(self, service_info_: ServiceInfo) -> None:
+        if not isinstance(service_info_, ServiceInfo):
             raise TypeError("service_info isn't a ServiceInfo class!")
 
-        if service_info.type != "_oscjson._tcp.local.":
+        if service_info_.type != "_oscjson._tcp.local.":
             raise ValueError("service_info does not represent an OSCQuery service!")
 
-        self.service_info = service_info
+        self.service_info = service_info_
         self.last_json = None
 
     def _get_query_root(self) -> str:
@@ -194,10 +198,10 @@ class OSCQueryClient(object):
         return f"http://{self._get_ip_str()}:{self.service_info.port}"
 
     def _get_ip_str(self) -> str:
-        """Converts the ServiceInfo address byte representation of an IP address into a string format."""
+        """Converts the ServiceInfo address byte representation of an IP address into a string."""
         return '.'.join([str(int(num)) for num in self.service_info.addresses[0]])
 
-    def query_node(self, node: str = "/") -> OSCQueryNode | None:
+    def query_node(self, node_: str = "/") -> OSCQueryNode | None:
         """
         Retrieves information about a specific node path from the OSCQuery service.
         Potential Raises: requests.HTTPError
@@ -212,7 +216,7 @@ class OSCQueryClient(object):
         OSCQueryNode or None
             An OSCQueryNode object representing the path queried.
         """
-        url = self._get_query_root() + node
+        url = self._get_query_root() + node_
         r = None
         try:
             r = requests.get(url)
@@ -223,7 +227,7 @@ class OSCQueryClient(object):
 
         if r.status_code == 404:
             return None
-        
+
         if r.status_code != 200:
             raise requests.HTTPError(f"Node query error: (HTTP {r.status_code}) {r.content}")
 
@@ -234,8 +238,8 @@ class OSCQueryClient(object):
 
     def get_host_info(self) -> OSCHostInfo | None:
         """
-        Retrieves information about the host from the OSCQuery service.
-        Service can contain details; such as the host name, IP address, port number, and transport protocol.
+        Retrieves information about the host from the OSCQuery service. Service can contain details;
+        such as the host name, IP address, port number, and transport protocol.
         Potential Raises: requests.HTTPError
 
         Returns
@@ -290,46 +294,44 @@ class OSCQueryClient(object):
         OSCQueryNode
             An OSCQueryNode object constructed from the JSON (dict) representation.
         """
-        newNode = OSCQueryNode()
+        new_node = OSCQueryNode()
 
         if "CONTENTS" in json:
-            subNodes = []
-            for subNode in json["CONTENTS"]:
-                subNodes.append(self._make_node_from_json(json["CONTENTS"][subNode]))
-            newNode.contents = subNodes
+            sub_nodes = []
+            for sub_nodes in json["CONTENTS"]:
+                sub_nodes.append(self._make_node_from_json(json["CONTENTS"][sub_nodes]))
+            new_node.contents = sub_nodes
 
         # This *should* be required but some implementations don't have it...
         if "FULL_PATH" in json:
-            newNode.full_path = json["FULL_PATH"]
+            new_node.full_path = json["FULL_PATH"]
 
         if "TYPE" in json:
-            newNode.type_ = OSC_Type_String_to_Python_Type(json["TYPE"])
+            new_node.type_ = OSC_Type_String_to_Python_Type(json["TYPE"])
 
         if "DESCRIPTION" in json:
-            newNode.description = json["DESCRIPTION"]
+            new_node.description = json["DESCRIPTION"]
 
         if "ACCESS" in json:
-            newNode.access = OSCAccess(json["ACCESS"])
+            new_node.access = OSCAccess(json["ACCESS"])
 
         if "VALUE" in json:
-            newNode.value = []
+            new_node.value = []
             # This should always be an array... throw an exception here?
             if not isinstance(json['VALUE'], list):
                 raise ValueError("OSCQuery JSON Value is not List / Array? Out-of-spec?")
-            
+
             for idx, v in enumerate(json["VALUE"]):
-                # According to the spec, if there is not yet a value, the return will be an empty JSON object
+                # According to the spec, if there is not yet a value,
+                # the return will be an empty JSON object
                 if isinstance(v, dict) and not v:
                     # FIXME does this apply to all values in the value array always...? I assume it does here
-                    newNode.value = []
+                    new_node.value = []
                     break
                 else:
-                    newNode.value.append(newNode.type_[idx](v))
+                    new_node.value.append(new_node.type_[idx](v))
 
-
-        return newNode
-
-
+        return new_node
 
 
 if __name__ == "__main__":
@@ -346,6 +348,3 @@ if __name__ == "__main__":
         # Query a node and print its value
         node = client.query_node("/test/node")
         print(f"Node is a {node.type_} with value {node.value}")
-
-        
-        

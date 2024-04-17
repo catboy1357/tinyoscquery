@@ -7,7 +7,8 @@ import json, threading
 
 class OSCQueryService(object):
     """
-    A class providing an OSCQuery service. Automatically sets up a oscjson http server and advertises the oscjson server and osc server on zeroconf.
+    A class providing an OSCQuery service. Automatically sets up a oscjson http server
+    and advertises the oscjson server and osc server on zeroconf.
     
     Description
     -----------
@@ -15,7 +16,6 @@ class OSCQueryService(object):
     It automatically sets up an oscjson HTTP server and advertises the oscjson
     server and osc server on zeroconf. This class allows adding nodes to the 
     OSCQueryService and advertising endpoints with given addresses and optional values.
-
 
     Attributes
     ----------
@@ -25,8 +25,9 @@ class OSCQueryService(object):
         Desired TCP port number for the oscjson HTTP server
     oscPort : int
         Desired UDP port number for the osc server
+    oscIP : str
+        The IP address used for OSC communication. Defaults to LocalHost if not specified.
     """
-    
     def __init__(self, serverName: str, httpPort: int, oscPort: int, oscIp="127.0.0.1") -> None:
         self.serverName = serverName
         self.httpPort = httpPort
@@ -34,13 +35,18 @@ class OSCQueryService(object):
         self.oscIp = oscIp
 
         self.root_node = OSCQueryNode("/", description="root node")
-        self.host_info = OSCHostInfo(serverName, {"ACCESS":True,"CLIPMODE":False,"RANGE":True,"TYPE":True,"VALUE":True}, 
-            self.oscIp, self.oscPort, "UDP")
+        self.host_info = OSCHostInfo(
+            serverName,
+            {"ACCESS":True,"CLIPMODE":False,"RANGE":True,"TYPE":True,"VALUE":True},
+            self.oscIp, self.oscPort, "UDP"
+        )
 
         self._zeroconf = Zeroconf()
         self._startOSCQueryService()
         self._advertiseOSCService()
-        self.http_server = OSCQueryHTTPServer(self.root_node, self.host_info, ('', self.httpPort), OSCQueryHTTPHandler)
+        self.http_server = OSCQueryHTTPServer(
+            self.root_node, self.host_info, ('', self.httpPort), OSCQueryHTTPHandler
+        )
         self.http_thread = threading.Thread(target=self._startHTTPServer)
         self.http_thread.start()
 
@@ -58,7 +64,8 @@ class OSCQueryService(object):
         """
         self.root_node.add_child_node(node)
 
-    def advertise_endpoint(self, address: str, value: list[Any]|Any = None, access:OSCAccess = OSCAccess.READWRITE_VALUE) -> None:
+    def advertise_endpoint(self, address: str, value: list[Any]|Any = None,
+                           access:OSCAccess = OSCAccess.READWRITE_VALUE) -> None:
         """
         Advertise an endpoint with a given address and optional value.
 
@@ -84,8 +91,10 @@ class OSCQueryService(object):
     def _startOSCQueryService(self) -> None:
         """Starts the OSCQuery service by registering OSCQuery service information."""
         oscqsDesc = {'txtvers': 1}
-        oscqsInfo = ServiceInfo("_oscjson._tcp.local.", "%s._oscjson._tcp.local." % self.serverName, self.httpPort, 
-        0, 0, oscqsDesc, "%s.oscjson.local." % self.serverName, addresses=["127.0.0.1"])
+        oscqsInfo = ServiceInfo(
+            "_oscjson._tcp.local.", "%s._oscjson._tcp.local." % self.serverName, self.httpPort,
+            0, 0, oscqsDesc, "%s.oscjson.local." % self.serverName, addresses=["127.0.0.1"]
+        )
         self._zeroconf.register_service(oscqsInfo)
 
 
@@ -96,8 +105,10 @@ class OSCQueryService(object):
     def _advertiseOSCService(self) -> None:
         """Advertises the OSC service by registering OSC service information."""
         oscDesc = {'txtvers': 1}
-        oscInfo = ServiceInfo("_osc._udp.local.", "%s._osc._udp.local." % self.serverName, self.oscPort, 
-        0, 0, oscDesc, "%s.osc.local." % self.serverName, addresses=["127.0.0.1"])
+        oscInfo = ServiceInfo(
+            "_osc._udp.local.", "%s._osc._udp.local." % self.serverName, self.oscPort,
+            0, 0, oscDesc, "%s.osc.local." % self.serverName, addresses=["127.0.0.1"]
+        )
 
         self._zeroconf.register_service(oscInfo)
 
@@ -123,7 +134,7 @@ class OSCQueryHTTPServer(HTTPServer):
         self,
         root_node: OSCQueryNode,
         host_info: OSCHostInfo,
-        server_address: tuple[str, int], 
+        server_address: tuple[str, int],
         RequestHandlerClass: Type[SimpleHTTPRequestHandler],
         bind_and_activate: bool = True
     ) -> None:
@@ -164,4 +175,3 @@ class OSCQueryHTTPHandler(SimpleHTTPRequestHandler):
     def log_message(self, format: str, *args) -> None:
         """Override default log message behavior."""
         pass
-            
