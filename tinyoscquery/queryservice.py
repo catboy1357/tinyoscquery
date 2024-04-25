@@ -9,7 +9,7 @@ class OSCQueryService(object):
     """
     A class providing an OSCQuery service. Automatically sets up a oscjson http server
     and advertises the oscjson server and osc server on zeroconf.
-    
+
     Description
     -----------
     OSCQueryService is a class designed to facilitate an OSCQuery service.
@@ -27,8 +27,11 @@ class OSCQueryService(object):
         Desired UDP port number for the osc server
     oscIP : str
         The IP address used for OSC communication. Defaults to LocalHost if not specified.
+    start : bool
+        Choose if the class automatically starts the services. Defaults to True
     """
-    def __init__(self, serverName: str, httpPort: int, oscPort: int, oscIp="127.0.0.1") -> None:
+
+    def __init__(self, serverName: str, httpPort: int, oscPort: int, oscIp: str = "127.0.0.1", start: bool = True) -> None:
         self.serverName = serverName
         self.httpPort = httpPort
         self.oscPort = oscPort
@@ -37,21 +40,58 @@ class OSCQueryService(object):
         self.root_node = OSCQueryNode("/", description="root node")
         self.host_info = OSCHostInfo(
             serverName,
-            {"ACCESS":True,"CLIPMODE":False,"RANGE":True,"TYPE":True,"VALUE":True},
+            {"ACCESS": True, "CLIPMODE": False,
+                "RANGE": True, "TYPE": True, "VALUE": True},
             self.oscIp, self.oscPort, "UDP"
         )
 
+        self._zeroconf = None
+        self.http_server = None
+        self.http_thread = None
+        if start:
+            self.start()
+
+    def __enter__(self) -> "OSCQueryService":
+        """Set up method to create a context manager"""
+        return self
+
+    def __exit__(self, *args):
+        """Stops all active services when the context manager closes"""
+        self.stop()
+
+    def start(self) -> None:
+        """
+        Start the services required by the class.
+
+        This method initializes Zeroconf and HTTP services.
+        """
         self._zeroconf = Zeroconf()
         self._startOSCQueryService()
         self._advertiseOSCService()
         self.http_server = OSCQueryHTTPServer(
-            self.root_node, self.host_info, ('', self.httpPort), OSCQueryHTTPHandler
+            self.root_node, self.host_info, (
+                '', self.httpPort
+            ), OSCQueryHTTPHandler
         )
         self.http_thread = threading.Thread(target=self._startHTTPServer)
         self.http_thread.start()
 
-    def __del__(self) -> None:
-        self._zeroconf.unregister_all_services()
+    def stop(self) -> None:
+        """
+        Stop the services managed by the class.
+
+        This method stops all services initiated by the `start` method.
+        It includes unregistering services from Zeroconf,
+        shutting down the HTTP server, and joining the HTTP server thread.
+        """
+        if self._zeroconf:
+            self._zeroconf.unregister_all_services()
+            self._zeroconf.close()
+        if self.http_server:
+            self.http_server.shutdown()
+            self.http_server.server_close()
+        if self.http_thread:
+            self.http_thread.join()
 
     def add_node(self, node: OSCQueryNode) -> None:
         """
