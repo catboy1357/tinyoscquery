@@ -16,39 +16,38 @@ A very simple, work in progress, OSCQuery library for python.
 To register a OSCQuery Service, simply construct a `OSCQueryService` (in `tinyoscquery.queryservice`) object with a name, and desired port numbers. The HTTP oscjson server and zeroconf advertisements will automatically start.
 
 ```Python
-import time
 from tinyoscquery.queryservice import OSCQueryService
 
-osc_port = 9020 # Find a predefined open port for OSC
-http_port = 9020 # Find a predefined open port for the oscjson http server -- can be the same port as osc
+osc_port = 9020  # Find a predefined open port for OSC
+http_port = 9020  # Find a predefined open port for the oscjson http server -- can be the same port as osc
 
 # Set up an OSCServer, likely with the python-osc first...
 
 oscqs = OSCQueryService("Test-Service", http_port, osc_port)
 
 # Do something else, the zeroconf advertising and oscjson server runs in the background
-while True:
-    time.sleep(1)
+input("Press enter to stop service...")
+oscqs.stop()
 
 ```
 
 If you want to select any open ports on the system to use, a port finder is provided in the `tinyoscquery.utility` package.
 
+As well, you can use `OSCQueryService` as a context manager to ensure automatic service management.
+
 ```Python
-import time
 from tinyoscquery.queryservice import OSCQueryService
 from tinyoscquery.utility import get_open_tcp_port, get_open_udp_port
 
-osc_port = get_open_udp_port() # Find a random open port for OSC
-http_port = get_open_tcp_port() # Find a random open port for the oscjson http server -- can be the same port as osc
+osc_port = get_open_udp_port()  # Find a random open port for OSC
+http_port = get_open_tcp_port()  # Find a random open port for the oscjson http server -- can be the same port as osc
 
 # Set up an OSCServer, likely with the python-osc first...
 
-oscqs = OSCQueryService("Test-Service", http_port, osc_port)
+with OSCQueryService("Test-Service", http_port, osc_port) as oscqs:  # Service will automatically close
 
-# Do something else, the zeroconf advertising and oscjson server runs in the background
-while True:
-    time.sleep(1)
+    # Do something else, the zeroconf advertising and oscjson server runs in the background
+    input("Press enter to stop service...")
 
 ```
 
