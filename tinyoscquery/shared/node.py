@@ -17,6 +17,7 @@ class OSCNodeEncoder(JSONEncoder):
         - Python type objects
 
     """
+
     def default(self, o: Any) -> dict[str, Any] | str:
         """
         Overrides the default method of JSONEncoder to customize serialization behavior
@@ -33,38 +34,73 @@ class OSCNodeEncoder(JSONEncoder):
             The serialized representation of the object.
         """
         if isinstance(o, OSCQueryNode):
-            obj_dict = {}
-            for k, v in vars(o).items():
-                if v is None:
-                    continue
-                if k.lower() == "type_":
-                    obj_dict["TYPE"] = Python_Type_List_to_OSC_Type(v)
-                if k == "contents":
-                    obj_dict["CONTENTS"] = {}
-                    for sub_node in v:
-                        if sub_node.full_path is not None:
-                            obj_dict["CONTENTS"][sub_node.full_path.split("/")[-1]] = sub_node
-                        else:
-                            continue
-                else:
-                    obj_dict[k.upper()] = v
-
-            # FIXME: I missed something, so here's a hack!
-
-            if "TYPE_" in obj_dict:
-                del obj_dict["TYPE_"]
-            return obj_dict
+            return self._serialize_osc_query_node(o)
 
         if isinstance(o, type):
             return Python_Type_List_to_OSC_Type([o])
 
         if isinstance(o, OSCHostInfo):
-            obj_dict = {}
-            for k, v in vars(o).items():
-                if v is None:
-                    continue
+            return self._serialize_osc_host_info(o)
+
+        return json.JSONEncoder.default(self, o)
+
+    def _serialize_osc_query_node(self, o: "OSCQueryNode") -> dict[str, Any]:
+        """
+        Serialize an OSCQueryNode object into a JSON-compatible dictionary.
+
+        Parameters
+        ----------
+        o : OSCQueryNode
+            The OSCQueryNode object to be serialized.
+
+        Returns
+        -------
+        dict
+            The serialized representation of the OSCQueryNode object.
+        """
+        obj_dict = {}
+        for k, v in vars(o).items():
+            if v is None:
+                continue
+            if k.lower() == "type_":
+                obj_dict["TYPE"] = Python_Type_List_to_OSC_Type(v)
+            if k == "contents":
+                obj_dict["CONTENTS"] = {}
+                for sub_node in v:
+                    if sub_node.full_path is not None:
+                        obj_dict["CONTENTS"][sub_node.full_path.split(
+                            "/")[-1]] = sub_node
+                    else:
+                        continue
+            else:
                 obj_dict[k.upper()] = v
-            return obj_dict
+
+        # FIXME: I missed something, so here's a hack!
+
+        if "TYPE_" in obj_dict:
+            del obj_dict["TYPE_"]
+        return obj_dict
+
+    def _serialize_osc_host_info(self, o: "OSCHostInfo") -> dict[str, Any]:
+        """
+        Serialize an OSCHostInfo object into a JSON-compatible dictionary.
+
+        Parameters
+        ----------
+        o : OSCHostInfo
+            The OSCHostInfo object to be serialized.
+
+        Returns
+        -------
+        dict
+            The serialized representation of the OSCHostInfo object.
+        """
+        obj_dict = {}
+        for k, v in vars(o).items():
+            if v is None:
+                continue
+            obj_dict[k.upper()] = v
+        return obj_dict
 
         return json.JSONEncoder.default(self, o)
 
