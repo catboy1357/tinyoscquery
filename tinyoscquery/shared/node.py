@@ -42,7 +42,7 @@ class OSCNodeEncoder(JSONEncoder):
         if isinstance(o, OSCHostInfo):
             return self._serialize_osc_host_info(o)
 
-        return json.JSONEncoder.default(self, o)
+        return super().default(o)
 
     def _serialize_osc_query_node(self, o: "OSCQueryNode") -> dict[str, Any]:
         """
@@ -58,27 +58,35 @@ class OSCNodeEncoder(JSONEncoder):
         dict
             The serialized representation of the OSCQueryNode object.
         """
-        obj_dict = {}
-        for k, v in vars(o).items():
-            if v is None:
-                continue
-            if k.lower() == "type_":
-                obj_dict["TYPE"] = Python_Type_List_to_OSC_Type(v)
-            if k == "contents":
-                obj_dict["CONTENTS"] = {}
-                for sub_node in v:
-                    if sub_node.full_path is not None:
-                        obj_dict["CONTENTS"][sub_node.full_path.split(
-                            "/")[-1]] = sub_node
-                    else:
-                        continue
-            else:
-                obj_dict[k.upper()] = v
+        # Dictionary comprehension to filter out None values and "type_"
+        obj_dict = {
+            k.upper(): v
+            for k, v in vars(o).items()
+            if v is not None and k.lower() != "type_"
+        }
 
-        # FIXME: I missed something, so here's a hack!
+        # Set the "TYPE" key to represent the type of the OSCQueryNode
+        obj_dict["TYPE"] = Python_Type_List_to_OSC_Type(
+            o.type_
+        ) if o.type_ else None
 
-        if "TYPE_" in obj_dict:
-            del obj_dict["TYPE_"]
+        # If the OSCQueryNode has contents, add them to the dictionary
+        if o.contents:
+            obj_dict["CONTENTS"] = {
+                sub_node.full_path.split("/")[-1]: sub_node
+                for sub_node in o.contents
+                if sub_node.full_path is not None
+            }
+
+        # # FIXME: I missed something, so here's a hack!
+        # This comment suggests a missing functionality or an overlooked issue.
+        # Unclear what exactly needs to be fixed or why this comment exists.
+        # Referring to removing "TYPE_" from the dict?
+        # Further investigation is needed to address this properly.
+
+        # Remove "TYPE_" key if it exists
+        obj_dict.pop("TYPE_", None)
+
         return obj_dict
 
     def _serialize_osc_host_info(self, o: "OSCHostInfo") -> dict[str, Any]:
@@ -95,14 +103,16 @@ class OSCNodeEncoder(JSONEncoder):
         dict
             The serialized representation of the OSCHostInfo object.
         """
-        obj_dict = {}
-        for k, v in vars(o).items():
-            if v is None:
-                continue
-            obj_dict[k.upper()] = v
-        return obj_dict
+        # Direct dictionary comprehension
+        return {
+            # Uppercase version of attribute name (k) with value (v)
+            k.upper(): v
+            # Iterate over each attribute (k) and value (v) in the object 'o'
+            for k, v in vars(o).items()
+            # Filtering out attributes with 'None' values
+            if v is not None
+        }
 
-        return json.JSONEncoder.default(self, o)
 
 class OSCAccess(IntEnum):
     """
