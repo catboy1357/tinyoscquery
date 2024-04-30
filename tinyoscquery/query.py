@@ -219,7 +219,11 @@ class OSCQueryClient(object):
         url = self._get_query_root() + node_
         r = None
         try:
-            r = requests.get(url)
+            r = requests.get(url, timeout=10)
+        except requests.exceptions.ConnectionError:
+            # If a client disconnects, the server will try and reconnect
+            # but will throw this error.
+            return None
         except Exception as ex:
             print("Error querying node...", ex)
         if r is None:
@@ -297,10 +301,11 @@ class OSCQueryClient(object):
         new_node = OSCQueryNode()
 
         if "CONTENTS" in json:
-            sub_nodes = []
+            child_node = []
             for sub_nodes in json["CONTENTS"]:
-                sub_nodes.append(self._make_node_from_json(json["CONTENTS"][sub_nodes]))
-            new_node.contents = sub_nodes
+                child_node.append(self._make_node_from_json(
+                    json["CONTENTS"][sub_nodes]))
+            new_node.contents = child_node
 
         # This *should* be required but some implementations don't have it...
         if "FULL_PATH" in json:
