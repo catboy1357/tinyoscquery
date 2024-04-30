@@ -3,13 +3,14 @@ import json
 from json import JSONEncoder
 from typing import Any, List
 
+
 class OSCNodeEncoder(JSONEncoder):
     """
     Custom JSON encoder for OSCQueryNode and OSCHostInfo objects.
 
     Description
     -----------
-    OSCNodeEncoder is a custom JSON encoder designed to serialize 
+    OSCNodeEncoder is a custom JSON encoder designed to serialize
     OSCQueryNode and OSCHostInfo objects into JSON format. It overrides the
     default behavior of JSONEncoder to handle custom serialization of:
         - OSCQueryNode
@@ -123,6 +124,7 @@ class OSCAccess(IntEnum):
     WRITEONLY_VALUE = 2
     READWRITE_VALUE = 3
 
+
 class OSCQueryNode():
     """
     Represents a node in the OSCQuery structure.
@@ -133,7 +135,7 @@ class OSCQueryNode():
     its full path, contents, access type, data type, description, value, and host information.
     It provides methods for finding subnodes, adding child nodes, converting to JSON format,
     and iteration over its contents.
-    
+
     Attributes
     ----------
     full_path : str or None, optional
@@ -151,6 +153,7 @@ class OSCQueryNode():
     host_info : OSCHostInfo or None, optional
         Information about the host associated with the node.
     """
+
     def __init__(self, full_path: str | None = None,
                  contents: List['OSCQueryNode'] | None = None,
                  type_: List[type] | None = None, access: OSCAccess | None = None,
@@ -164,7 +167,6 @@ class OSCQueryNode():
         self.value = value
         self.description = description
         self.host_info = host_info
-
 
     def find_subnode(self, full_path: str) -> 'OSCQueryNode | None':
         """
@@ -207,9 +209,12 @@ class OSCQueryNode():
         if child == self:
             return
 
-        path_split = child.full_path.rsplit("/",1)
+        path_split = child.full_path.rsplit("/", 1)
         if len(path_split) < 2:
-            raise NodeError("Tried to add child node with invalid full path!", path=path_split)
+            raise NodeError(
+                "Tried to add child node with invalid full path!",
+                path=path_split
+            )
 
         parent_path = path_split[0]
 
@@ -226,11 +231,9 @@ class OSCQueryNode():
             parent.contents = []
         parent.contents.append(child)
 
-
-    def to_json(self) -> dict[str, Any]:
+    def to_json(self) -> str:
         """Converts the node and its contents to a JSON string."""
         return json.dumps(self, cls=OSCNodeEncoder)
-
 
     def __iter__(self):
         """
@@ -259,6 +262,7 @@ class OSCQueryNode():
         return_str += f'T:{self.type_} V:{self.value})>'
         return return_str
 
+
 class NodeError(ValueError):
     """
     Exception raised for errors related to OSCQuery nodes.
@@ -268,6 +272,7 @@ class NodeError(ValueError):
     path : str or None
         The path of the node where the error occurred, if available.
     """
+
     def __init__(self, *args, **kwargs) -> None:
         self.path = kwargs.pop('path', None)
         super().__init__(*args, **kwargs)
@@ -278,6 +283,7 @@ class NodeError(ValueError):
         if self.path is not None:
             msg += f' "{self.path}"'
         return msg
+
 
 class OSCHostInfo():
     """
@@ -306,6 +312,7 @@ class OSCHostInfo():
     ws_port : int or None, optional
         The port number for WebSocket communication.
     """
+
     def __init__(self, name: str, extensions: list[str],
                  osc_ip: str | None = None, osc_port: int | None = None,
                  osc_transport: str | None = None, ws_ip: str | None = None,
@@ -356,7 +363,9 @@ def OSC_Type_String_to_Python_Type(typestr: str) -> List[type]:
         elif typevalue == "s":
             types.append(str)
         else:
-            raise ValueError(f"Unknown OSC type when converting! {typevalue} -> ???")
+            raise ValueError(
+                f"Unknown OSC type when converting! {typevalue} -> ???"
+            )
 
     return types
 
@@ -399,7 +408,7 @@ if __name__ == "__main__":
     root.add_child_node(OSCQueryNode("/test/othernode/one"))
     root.add_child_node(OSCQueryNode("/test/othernode/three"))
 
-    #print(root)
+    # print(root)
 
     for child in root:
         print(child)

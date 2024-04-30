@@ -1,8 +1,8 @@
+import threading
 from typing import Any, Type
-from zeroconf import ServiceInfo, Zeroconf
 from http.server import SimpleHTTPRequestHandler, HTTPServer
+from zeroconf import ServiceInfo, Zeroconf
 from .shared.node import OSCQueryNode, OSCHostInfo, OSCAccess
-import json, threading
 
 
 class OSCQueryService(object):
@@ -31,7 +31,10 @@ class OSCQueryService(object):
         Choose if the class automatically starts the services. Defaults to True
     """
 
-    def __init__(self, serverName: str, httpPort: int, oscPort: int, oscIp: str = "127.0.0.1", start: bool = True) -> None:
+    def __init__(
+        self, serverName: str, httpPort: int, oscPort: int,
+        oscIp: str = "127.0.0.1", start: bool = True
+    ) -> None:
         self.serverName = serverName
         self.httpPort = httpPort
         self.oscPort = oscPort
@@ -40,8 +43,10 @@ class OSCQueryService(object):
         self.root_node = OSCQueryNode("/", description="root node")
         self.host_info = OSCHostInfo(
             serverName,
-            {"ACCESS": True, "CLIPMODE": False,
-                "RANGE": True, "TYPE": True, "VALUE": True},
+            {
+                "ACCESS": True, "CLIPMODE": False,
+                "RANGE": True, "TYPE": True, "VALUE": True
+            },
             self.oscIp, self.oscPort, "UDP"
         )
 
@@ -104,8 +109,10 @@ class OSCQueryService(object):
         """
         self.root_node.add_child_node(node)
 
-    def advertise_endpoint(self, address: str, value: list[Any]|Any = None,
-                           access:OSCAccess = OSCAccess.READWRITE_VALUE) -> None:
+    def advertise_endpoint(
+        self, address: str, value: list[Any] | Any = None,
+        access: OSCAccess = OSCAccess.READWRITE_VALUE
+    ) -> None:
         """
         Advertise an endpoint with a given address and optional value.
 
@@ -137,7 +144,6 @@ class OSCQueryService(object):
         )
         self._zeroconf.register_service(oscqsInfo)
 
-
     def _startHTTPServer(self) -> None:
         """Starts the HTTP server by serving requests forever."""
         self.http_server.serve_forever()
@@ -156,7 +162,7 @@ class OSCQueryService(object):
 class OSCQueryHTTPServer(HTTPServer):
     """
     Custom HTTP server for OSCQuery service.
-    
+
     Attributes
     ----------
     root_node : OSCQueryNode
@@ -170,6 +176,7 @@ class OSCQueryHTTPServer(HTTPServer):
     bind_and_activate : bool
         A boolean indicating whether to bind and activate the server.
     """
+
     def __init__(
         self,
         root_node: OSCQueryNode,
@@ -198,7 +205,9 @@ class OSCQueryHTTPHandler(SimpleHTTPRequestHandler):
             self.send_response(200)
             self.send_header("Content-type", "text/json")
             self.end_headers()
-            self.wfile.write(bytes(str(self.server.host_info.to_json()), 'utf-8'))
+            self.wfile.write(bytes(str(
+                self.server.host_info.to_json()
+                ), 'utf-8'))
             return
         node = self.server.root_node.find_subnode(self.path)
         if node is None:
