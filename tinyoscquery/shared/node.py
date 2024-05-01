@@ -299,8 +299,8 @@ class OSCHostInfo():
     ----------
     name : str
         The name of the host.
-    extensions : list[str]
-        List of extensions supported by the host.
+    extensions : dict[str, bool]
+        dictionary of extensions supported by the host.
     osc_ip : str or None, optional
         The IP address for OSC communication.
     osc_port : int or None, optional
@@ -313,7 +313,7 @@ class OSCHostInfo():
         The port number for WebSocket communication.
     """
 
-    def __init__(self, name: str, extensions: list[str],
+    def __init__(self, name: str, extensions: dict[str, bool],
                  osc_ip: str | None = None, osc_port: int | None = None,
                  osc_transport: str | None = None, ws_ip: str | None = None,
                  ws_port: int | None = None) -> None:
