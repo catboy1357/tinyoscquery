@@ -3,13 +3,14 @@ import json
 from json import JSONEncoder
 from typing import Any, List
 
+
 class OSCNodeEncoder(JSONEncoder):
     """
     Custom JSON encoder for OSCQueryNode and OSCHostInfo objects.
 
     Description
     -----------
-    OSCNodeEncoder is a custom JSON encoder designed to serialize 
+    OSCNodeEncoder is a custom JSON encoder designed to serialize
     OSCQueryNode and OSCHostInfo objects into JSON format. It overrides the
     default behavior of JSONEncoder to handle custom serialization of:
         - OSCQueryNode
@@ -17,6 +18,7 @@ class OSCNodeEncoder(JSONEncoder):
         - Python type objects
 
     """
+
     def default(self, o: Any) -> dict[str, Any] | str:
         """
         Overrides the default method of JSONEncoder to customize serialization behavior
@@ -33,40 +35,85 @@ class OSCNodeEncoder(JSONEncoder):
             The serialized representation of the object.
         """
         if isinstance(o, OSCQueryNode):
-            obj_dict = {}
-            for k, v in vars(o).items():
-                if v is None:
-                    continue
-                if k.lower() == "type_":
-                    obj_dict["TYPE"] = Python_Type_List_to_OSC_Type(v)
-                if k == "contents":
-                    obj_dict["CONTENTS"] = {}
-                    for sub_node in v:
-                        if sub_node.full_path is not None:
-                            obj_dict["CONTENTS"][sub_node.full_path.split("/")[-1]] = sub_node
-                        else:
-                            continue
-                else:
-                    obj_dict[k.upper()] = v
-
-            # FIXME: I missed something, so here's a hack!
-
-            if "TYPE_" in obj_dict:
-                del obj_dict["TYPE_"]
-            return obj_dict
+            return self._serialize_osc_query_node(o)
 
         if isinstance(o, type):
             return Python_Type_List_to_OSC_Type([o])
 
         if isinstance(o, OSCHostInfo):
-            obj_dict = {}
-            for k, v in vars(o).items():
-                if v is None:
-                    continue
-                obj_dict[k.upper()] = v
-            return obj_dict
+            return self._serialize_osc_host_info(o)
 
-        return json.JSONEncoder.default(self, o)
+        return super().default(o)
+
+    def _serialize_osc_query_node(self, o: "OSCQueryNode") -> dict[str, Any]:
+        """
+        Serialize an OSCQueryNode object into a JSON-compatible dictionary.
+
+        Parameters
+        ----------
+        o : OSCQueryNode
+            The OSCQueryNode object to be serialized.
+
+        Returns
+        -------
+        dict
+            The serialized representation of the OSCQueryNode object.
+        """
+        # Dictionary comprehension to filter out None values and "type_"
+        obj_dict = {
+            k.upper(): v
+            for k, v in vars(o).items()
+            if v is not None and k.lower() != "type_"
+        }
+
+        # Set the "TYPE" key to represent the type of the OSCQueryNode
+        obj_dict["TYPE"] = Python_Type_List_to_OSC_Type(
+            o.type_
+        ) if o.type_ else None
+
+        # If the OSCQueryNode has contents, add them to the dictionary
+        if o.contents:
+            obj_dict["CONTENTS"] = {
+                sub_node.full_path.split("/")[-1]: sub_node
+                for sub_node in o.contents
+                if sub_node.full_path is not None
+            }
+
+        # # FIXME: I missed something, so here's a hack!
+        # This comment suggests a missing functionality or an overlooked issue.
+        # Unclear what exactly needs to be fixed or why this comment exists.
+        # Referring to removing "TYPE_" from the dict?
+        # Further investigation is needed to address this properly.
+
+        # Remove "TYPE_" key if it exists
+        obj_dict.pop("TYPE_", None)
+
+        return obj_dict
+
+    def _serialize_osc_host_info(self, o: "OSCHostInfo") -> dict[str, Any]:
+        """
+        Serialize an OSCHostInfo object into a JSON-compatible dictionary.
+
+        Parameters
+        ----------
+        o : OSCHostInfo
+            The OSCHostInfo object to be serialized.
+
+        Returns
+        -------
+        dict
+            The serialized representation of the OSCHostInfo object.
+        """
+        # Direct dictionary comprehension
+        return {
+            # Uppercase version of attribute name (k) with value (v)
+            k.upper(): v
+            # Iterate over each attribute (k) and value (v) in the object 'o'
+            for k, v in vars(o).items()
+            # Filtering out attributes with 'None' values
+            if v is not None
+        }
+
 
 class OSCAccess(IntEnum):
     """
@@ -76,6 +123,7 @@ class OSCAccess(IntEnum):
     READONLY_VALUE = 1
     WRITEONLY_VALUE = 2
     READWRITE_VALUE = 3
+
 
 class OSCQueryNode():
     """
@@ -87,7 +135,7 @@ class OSCQueryNode():
     its full path, contents, access type, data type, description, value, and host information.
     It provides methods for finding subnodes, adding child nodes, converting to JSON format,
     and iteration over its contents.
-    
+
     Attributes
     ----------
     full_path : str or None, optional
@@ -105,6 +153,7 @@ class OSCQueryNode():
     host_info : OSCHostInfo or None, optional
         Information about the host associated with the node.
     """
+
     def __init__(self, full_path: str | None = None,
                  contents: List['OSCQueryNode'] | None = None,
                  type_: List[type] | None = None, access: OSCAccess | None = None,
@@ -118,7 +167,6 @@ class OSCQueryNode():
         self.value = value
         self.description = description
         self.host_info = host_info
-
 
     def find_subnode(self, full_path: str) -> 'OSCQueryNode | None':
         """
@@ -161,9 +209,12 @@ class OSCQueryNode():
         if child == self:
             return
 
-        path_split = child.full_path.rsplit("/",1)
+        path_split = child.full_path.rsplit("/", 1)
         if len(path_split) < 2:
-            raise NodeError("Tried to add child node with invalid full path!", path=path_split)
+            raise NodeError(
+                "Tried to add child node with invalid full path!",
+                path=path_split
+            )
 
         parent_path = path_split[0]
 
@@ -180,11 +231,9 @@ class OSCQueryNode():
             parent.contents = []
         parent.contents.append(child)
 
-
-    def to_json(self) -> dict[str, Any]:
+    def to_json(self) -> str:
         """Converts the node and its contents to a JSON string."""
         return json.dumps(self, cls=OSCNodeEncoder)
-
 
     def __iter__(self):
         """
@@ -213,6 +262,7 @@ class OSCQueryNode():
         return_str += f'T:{self.type_} V:{self.value})>'
         return return_str
 
+
 class NodeError(ValueError):
     """
     Exception raised for errors related to OSCQuery nodes.
@@ -222,6 +272,7 @@ class NodeError(ValueError):
     path : str or None
         The path of the node where the error occurred, if available.
     """
+
     def __init__(self, *args, **kwargs) -> None:
         self.path = kwargs.pop('path', None)
         super().__init__(*args, **kwargs)
@@ -232,6 +283,7 @@ class NodeError(ValueError):
         if self.path is not None:
             msg += f' "{self.path}"'
         return msg
+
 
 class OSCHostInfo():
     """
@@ -247,8 +299,8 @@ class OSCHostInfo():
     ----------
     name : str
         The name of the host.
-    extensions : list[str]
-        List of extensions supported by the host.
+    extensions : dict[str, bool]
+        dictionary of extensions supported by the host.
     osc_ip : str or None, optional
         The IP address for OSC communication.
     osc_port : int or None, optional
@@ -260,7 +312,8 @@ class OSCHostInfo():
     ws_port : int or None, optional
         The port number for WebSocket communication.
     """
-    def __init__(self, name: str, extensions: list[str],
+
+    def __init__(self, name: str, extensions: dict[str, bool],
                  osc_ip: str | None = None, osc_port: int | None = None,
                  osc_transport: str | None = None, ws_ip: str | None = None,
                  ws_port: int | None = None) -> None:
@@ -310,7 +363,9 @@ def OSC_Type_String_to_Python_Type(typestr: str) -> List[type]:
         elif typevalue == "s":
             types.append(str)
         else:
-            raise ValueError(f"Unknown OSC type when converting! {typevalue} -> ???")
+            raise ValueError(
+                f"Unknown OSC type when converting! {typevalue} -> ???"
+            )
 
     return types
 
@@ -353,7 +408,7 @@ if __name__ == "__main__":
     root.add_child_node(OSCQueryNode("/test/othernode/one"))
     root.add_child_node(OSCQueryNode("/test/othernode/three"))
 
-    #print(root)
+    # print(root)
 
     for child in root:
         print(child)

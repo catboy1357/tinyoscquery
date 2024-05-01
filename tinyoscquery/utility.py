@@ -1,5 +1,6 @@
 import socket
 
+
 def get_open_tcp_port() -> int:
     '''
     Finds a valid, open, TCP port.
@@ -14,6 +15,7 @@ def get_open_tcp_port() -> int:
     port = s.getsockname()[1]
     s.close()
     return port
+
 
 def get_open_udp_port() -> int:
     '''

@@ -11,5 +11,6 @@ if __name__ == "__main__":
 
     print(oscqs.root_node)
 
-    while True:
-        time.sleep(1)
+    input("Press enter to stop service...")
+
+    oscqs.stop()
