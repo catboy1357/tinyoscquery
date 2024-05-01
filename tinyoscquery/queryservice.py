@@ -1,8 +1,9 @@
+import socket
+import threading
 from typing import Any, Type
-from zeroconf import ServiceInfo, Zeroconf
 from http.server import SimpleHTTPRequestHandler, HTTPServer
+from zeroconf import ServiceInfo, Zeroconf
 from .shared.node import OSCQueryNode, OSCHostInfo, OSCAccess
-import json, threading
 
 
 class OSCQueryService(object):
@@ -31,7 +32,10 @@ class OSCQueryService(object):
         Choose if the class automatically starts the services. Defaults to True
     """
 
-    def __init__(self, serverName: str, httpPort: int, oscPort: int, oscIp: str = "127.0.0.1", start: bool = True) -> None:
+    def __init__(
+        self, serverName: str, httpPort: int, oscPort: int,
+        oscIp: str = "127.0.0.1", start: bool = True
+    ) -> None:
         self.serverName = serverName
         self.httpPort = httpPort
         self.oscPort = oscPort
@@ -40,8 +44,10 @@ class OSCQueryService(object):
         self.root_node = OSCQueryNode("/", description="root node")
         self.host_info = OSCHostInfo(
             serverName,
-            {"ACCESS": True, "CLIPMODE": False,
-                "RANGE": True, "TYPE": True, "VALUE": True},
+            {
+                "ACCESS": True, "CLIPMODE": False,
+                "RANGE": True, "TYPE": True, "VALUE": True
+            },
             self.oscIp, self.oscPort, "UDP"
         )
 
@@ -62,6 +68,7 @@ class OSCQueryService(object):
     def start(self) -> None:
         """
         Start the services required by the class.
+        Potential Raises: ValueError
 
         This method initializes Zeroconf and HTTP services.
         """
@@ -104,8 +111,10 @@ class OSCQueryService(object):
         """
         self.root_node.add_child_node(node)
 
-    def advertise_endpoint(self, address: str, value: list[Any]|Any = None,
-                           access:OSCAccess = OSCAccess.READWRITE_VALUE) -> None:
+    def advertise_endpoint(
+        self, address: str, value: list[Any] | Any = None,
+        access: OSCAccess = OSCAccess.READWRITE_VALUE
+    ) -> None:
         """
         Advertise an endpoint with a given address and optional value.
 
@@ -128,35 +137,74 @@ class OSCQueryService(object):
                 new_node.type_ = [type(v) for v in value]
         self.add_node(new_node)
 
+    def _register_service(
+        self, service_name: str, name_suffix: str,
+        port: int, desc: dict[str, int], ip: str = "127.0.0.1"
+    ) -> None:
+        """
+        Registers a service with the provided parameters using Zeroconf.
+        The service will be available for discovery on the network.
+        Potential Raises: ValueError
+
+        Parameters
+        ----------
+        service_name : str
+            The name of the service.
+        name_suffix : str
+            The suffix to be appended to the service name.
+        port : int
+            The port on which the service is running.
+        desc : dict[str, int]
+            A dictionary containing descriptive information about the service.
+        ip : str, optional
+            The IP address on which the service will be available. Default is "127.0.0.1".
+        """
+        if not self._zeroconf:
+            raise ValueError(
+                "Zeroconf was not initialized. Failed to register service."
+            )
+
+        self._zeroconf.register_service(ServiceInfo(
+            service_name,
+            f"{self.serverName}.{service_name}",
+            port, 0, 0, desc,
+            f"{self.serverName}.{name_suffix}",
+            addresses=[socket.inet_pton(socket.AF_INET, ip)]
+        ))
+
     def _startOSCQueryService(self) -> None:
         """Starts the OSCQuery service by registering OSCQuery service information."""
-        oscqsDesc = {'txtvers': 1}
-        oscqsInfo = ServiceInfo(
-            "_oscjson._tcp.local.", "%s._oscjson._tcp.local." % self.serverName, self.httpPort,
-            0, 0, oscqsDesc, "%s.oscjson.local." % self.serverName, addresses=["127.0.0.1"]
+        oscqs_desc = {'txtvers': 1}
+        self._register_service(
+            "_oscjson._tcp.local.",
+            "oscjson.local.",
+            self.httpPort,
+            oscqs_desc
         )
-        self._zeroconf.register_service(oscqsInfo)
-
 
     def _startHTTPServer(self) -> None:
         """Starts the HTTP server by serving requests forever."""
+        if not self.http_server:
+            raise ValueError(
+                "HTTP Server was not initialized. Failed to serve."
+            )
         self.http_server.serve_forever()
 
     def _advertiseOSCService(self) -> None:
         """Advertises the OSC service by registering OSC service information."""
-        oscDesc = {'txtvers': 1}
-        oscInfo = ServiceInfo(
-            "_osc._udp.local.", "%s._osc._udp.local." % self.serverName, self.oscPort,
-            0, 0, oscDesc, "%s.osc.local." % self.serverName, addresses=["127.0.0.1"]
+        osc_desc = {'txtvers': 1}
+        self._register_service(
+            "_osc._udp.local.",
+            "osc.local.",
+            self.oscPort,
+            osc_desc
         )
-
-        self._zeroconf.register_service(oscInfo)
 
 
 class OSCQueryHTTPServer(HTTPServer):
     """
     Custom HTTP server for OSCQuery service.
-    
+
     Attributes
     ----------
     root_node : OSCQueryNode
@@ -170,6 +218,7 @@ class OSCQueryHTTPServer(HTTPServer):
     bind_and_activate : bool
         A boolean indicating whether to bind and activate the server.
     """
+
     def __init__(
         self,
         root_node: OSCQueryNode,
@@ -186,6 +235,7 @@ class OSCQueryHTTPServer(HTTPServer):
 
 class OSCQueryHTTPHandler(SimpleHTTPRequestHandler):
     """HTTP request handler for OSCQuery service."""
+    query_server: 'OSCQueryService'  # Static type checking
 
     def do_GET(self) -> None:
         """
@@ -198,9 +248,11 @@ class OSCQueryHTTPHandler(SimpleHTTPRequestHandler):
             self.send_response(200)
             self.send_header("Content-type", "text/json")
             self.end_headers()
-            self.wfile.write(bytes(str(self.server.host_info.to_json()), 'utf-8'))
+            self.wfile.write(bytes(str(
+                self.query_server.host_info.to_json()
+            ), 'utf-8'))
             return
-        node = self.server.root_node.find_subnode(self.path)
+        node = self.query_server.root_node.find_subnode(self.path)
         if node is None:
             self.send_response(404)
             self.send_header("Content-type", "text/json")
