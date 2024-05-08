@@ -235,7 +235,9 @@ class OSCQueryHTTPServer(HTTPServer):
 
 class OSCQueryHTTPHandler(SimpleHTTPRequestHandler):
     """HTTP request handler for OSCQuery service."""
-    query_server: 'OSCQueryService'  # Static type checking
+    # Used for static type checking
+    # must be 'server' to use the super class variable
+    server: 'OSCQueryService'  # FIXME # type: ignore
 
     def do_GET(self) -> None:
         """
@@ -249,10 +251,10 @@ class OSCQueryHTTPHandler(SimpleHTTPRequestHandler):
             self.send_header("Content-type", "text/json")
             self.end_headers()
             self.wfile.write(bytes(str(
-                self.query_server.host_info.to_json()
+                self.server.host_info.to_json()
             ), 'utf-8'))
             return
-        node = self.query_server.root_node.find_subnode(self.path)
+        node = self.server.root_node.find_subnode(self.path)
         if node is None:
             self.send_response(404)
             self.send_header("Content-type", "text/json")
