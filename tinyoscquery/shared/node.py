@@ -1,6 +1,7 @@
 from enum import IntEnum
 import json
 from json import JSONEncoder
+from types import MappingProxyType
 from typing import Any, List
 
 
@@ -334,7 +335,34 @@ class OSCHostInfo():
         return json.dumps(self, cls=OSCNodeEncoder)
 
 
-def OSC_Type_String_to_Python_Type(typestr: str) -> List[type]:
+class TypeMappings:
+    """
+    Data class to cache the type lookups for osc or python conversions.
+    Contains dictionaries mapping OSC types to Python types and vice versa.
+    """
+    _OSC_TO_PYTHON_TYPES = {
+        'i': int,
+        'f': float, 'h': float, 'd': float, 't': float,
+        'T': bool, 'F': bool,
+        's': str
+    }
+
+    _PYTHON_TO_OSC_TYPES = {
+        int: 'i',
+        float: 'f',
+        bool: 'T',
+        str: 's'
+    }
+
+    # Using MappingProxyType to create read-only views of dictionaries
+    OSC_TO_PYTHON_TYPES = MappingProxyType(_OSC_TO_PYTHON_TYPES)
+    PYTHON_TO_OSC_TYPES = MappingProxyType(_PYTHON_TO_OSC_TYPES)
+
+
+def OSC_Type_String_to_Python_Type(
+    typestr: str,
+    type_map: MappingProxyType[str, type] = TypeMappings.OSC_TO_PYTHON_TYPES
+) -> List[type]:
     """
     Convert an OSC type string to a list of corresponding Python types.
     Potential Raises: ValueError
@@ -349,28 +377,20 @@ def OSC_Type_String_to_Python_Type(typestr: str) -> List[type]:
     list[type]
         A list of Python types corresponding to the OSC type string.
     """
-    types = []
-    for typevalue in typestr:
-        if typevalue == '':
-            continue
+    try:
+        # Using list comprehension for efficient mapping lookup
+        return [type_map[typevalue] for typevalue in typestr]
 
-        if typevalue == "i":
-            types.append(int)
-        elif typevalue == "f" or typevalue == "h" or typevalue == "d" or typevalue == "t":
-            types.append(float)
-        elif typevalue == "T" or typevalue == "F":
-            types.append(bool)
-        elif typevalue == "s":
-            types.append(str)
-        else:
-            raise ValueError(
-                f"Unknown OSC type when converting! {typevalue} -> ???"
-            )
-
-    return types
+    except KeyError as e:
+        raise ValueError(
+            f"Unknown OSC type when converting! {e.args[0]} -> ???"
+        ) from e
 
 
-def Python_Type_List_to_OSC_Type(types_: List[type]) -> str:
+def Python_Type_List_to_OSC_Type(
+    types_: List[type],
+    type_map: MappingProxyType[type, str] = TypeMappings.PYTHON_TO_OSC_TYPES
+) -> str:
     """
     Convert a list of Python types to a corresponding OSC type string.
     Potential Raises: ValueError
@@ -385,20 +405,15 @@ def Python_Type_List_to_OSC_Type(types_: List[type]) -> str:
     str
         The OSC type string corresponding to the Python types.
     """
-    output = []
-    for type_ in types_:
-        if type_ == int:
-            output.append("i")
-        elif type_ == float:
-            output.append("f")
-        elif type_ == bool:
-            output.append("T")
-        elif type_ == str:
-            output.append("s")
-        else:
-            raise ValueError(f"Cannot convert {type_} to OSC type!")
+    try:
+        osc_types = ''
+        for type_ in types_:  # loop was tested faster then comprehension here
+            # Concatenating OSC type strings directly for performance
+            osc_types += type_map[type_]
+        return osc_types
 
-    return " ".join(output)
+    except KeyError as e:
+        raise ValueError(f"Cannot convert {e.args[0]} to OSC type!") from e
 
 
 if __name__ == "__main__":
