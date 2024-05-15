@@ -257,11 +257,18 @@ class OSCQueryNode():
         - D - Description
         - T - Type
         - V - Value
+        - C - Child Node
+        - A - Access
         """
-        return_str = f'<OSCQueryNode @ {self.full_path} '
-        return_str += f'(D: "{self.description}" '
-        return_str += f'T:{self.type_} V:{self.value})>'
-        return return_str
+        return_parts = [
+            f'@: {self.full_path} ' if self.full_path else '',
+            f'D: "{self.description}" ' if self.description else '',
+            f'T:{self.type_} ' if self.type_ else '',
+            f'V:{self.value} ' if self.value else '',
+            f'C:{len(self.contents)} ' if self.contents else '',
+            f'A:{self.access} ' if self.access else '',
+        ]
+        return f'<OSCQueryNode: ( {"".join(return_parts)})>'
 
 
 class NodeError(ValueError):
