@@ -179,8 +179,8 @@ class OSCQueryClient(object):
 
     Description
     -----------
-    OSCQueryClient provides functionality to communicate with an OSCQuery service. 
-    It allows querying information about specific nodes, retrieving host information, 
+    OSCQueryClient provides functionality to communicate with an OSCQuery service.
+    It allows querying information about specific nodes, retrieving host information,
     and constructing OSCQueryNode objects from JSON representations.
 
     Attributes
@@ -209,6 +209,40 @@ class OSCQueryClient(object):
         """Converts the ServiceInfo address byte representation of an IP address into a string."""
         return '.'.join([str(int(num)) for num in self.service_info.addresses[0]])
 
+    def _handle_request(self, url: str) -> requests.Response | None:
+        """
+        Handles an HTTP GET request to the specified URL and returns the response.
+
+        Parameters
+        ----------
+        url : str
+            The URL to send the GET request to.
+
+        Returns
+        -------
+        requests.Response or None
+            The response object if the request is successful, otherwise None.
+        """
+        response = None
+        try:
+            response = requests.get(url, timeout=10)
+        except requests.exceptions.ConnectionError:
+            pass
+        except Exception as e:
+            exception_type = type(e).__name__
+            print(f'Type: {exception_type} ->', e)
+
+        if response is None or response.status_code == 404:
+            return None
+
+        if response.status_code != 200:
+            raise requests.HTTPError(
+                f"Node query error: (HTTP {response.status_code}) {
+                    response.content}"
+            )
+
+        return response
+
     def query_node(self, node_: str = "/") -> OSCQueryNode | None:
         """
         Retrieves information about a specific node path from the OSCQuery service.
@@ -225,28 +259,11 @@ class OSCQueryClient(object):
             An OSCQueryNode object representing the path queried.
         """
         url = self._get_query_root() + node_
-        r = None
-        try:
-            r = requests.get(url, timeout=10)
-        except requests.exceptions.ConnectionError:
-            # If a client disconnects, the server will try and reconnect
-            # but will throw this error.
-            return None
-        except Exception as ex:
-            print("Error querying node...", ex)
-        if r is None:
+        response = self._handle_request(url)
+        if response is None:
             return None
 
-        if r.status_code == 404:
-            return None
-
-        if r.status_code != 200:
-            raise requests.HTTPError(
-                f"Node query error: (HTTP {r.status_code}) {r.content}"
-            )
-
-        self.last_json = r.json()
-
+        self.last_json = response.json()
         return self._make_node_from_json(self.last_json)
 
     def get_host_info(self) -> OSCHostInfo | None:
@@ -261,36 +278,15 @@ class OSCQueryClient(object):
             An OSCHostInfo object representing the host information if available
         """
         url = self._get_query_root() + "/HOST_INFO"
-        r = None
-        try:
-            r = requests.get(url)
-        except Exception as ex:
-            # print("Error querying HOST_INFO...", ex)
-            pass
-        if r is None:
+        response = self._handle_request(url)
+        if response is None:
             return None
 
-        if r.status_code != 200:
-            raise requests.HTTPError(
-                f"Node query error: (HTTP {r.status_code}) {r.content}"
-            )
-
-        json = r.json()
-        hi = OSCHostInfo(json["NAME"], json['EXTENSIONS'])
-        if 'OSC_IP' in json:
-            hi.osc_ip = json["OSC_IP"]
-        else:
-            hi.osc_ip = self._get_ip_str()
-
-        if 'OSC_PORT' in json:
-            hi.osc_port = json['OSC_PORT']
-        else:
-            hi.osc_port = self.service_info.port
-
-        if 'OSC_TRANSPORT' in json:
-            hi.osc_transport = json['OSC_TRANSPORT']
-        else:
-            hi.osc_transport = "UDP"
+        json: dict[str, Any] = response.json()
+        hi = OSCHostInfo(json["NAME"], json.get('EXTENSIONS', []))
+        hi.osc_ip = json.get('OSC_IP', self._get_ip_str)
+        hi.osc_port = json.get('OSC_PORT', self.service_info.port)
+        hi.osc_transport = json.get('OSC_TRANSPORT', 'UDP')
 
         return hi
 
@@ -309,45 +305,40 @@ class OSCQueryClient(object):
         OSCQueryNode
             An OSCQueryNode object constructed from the JSON (dict) representation.
         """
+        values = json.get("VALUE")
+        # This should always be an array... throw an exception here?
+        if values is not None and not isinstance(values, list):
+            raise ValueError(
+                "OSCQuery JSON Value is not List / Array? Out-of-spec?"
+            )
+
+        # full_path *should* be required but some implementations don't have it
         new_node = OSCQueryNode()
+        new_node.full_path = json.get("FULL_PATH")
+        new_node.access = json.get("ACCESS")
+        new_node.description = json.get("DESCRIPTION")
 
-        if "CONTENTS" in json:
-            child_node = []
-            for sub_nodes in json["CONTENTS"]:
-                child_node.append(self._make_node_from_json(
-                    json["CONTENTS"][sub_nodes]))
-            new_node.contents = child_node
+        new_node.contents = [
+            self._make_node_from_json(json["CONTENTS"][sub_nodes])
+            for sub_nodes in json.get("CONTENTS", [])
+        ]
 
-        # This *should* be required but some implementations don't have it...
-        if "FULL_PATH" in json:
-            new_node.full_path = json["FULL_PATH"]
+        new_node.type_ = (
+            OSC_Type_String_to_Python_Type(json["TYPE"])
+            if "TYPE" in json else None
+        )
 
-        if "TYPE" in json:
-            new_node.type_ = OSC_Type_String_to_Python_Type(json["TYPE"])
+        # According to the spec, if there is not yet a value,
+        # the return will be an empty JSON object
+        new_node.value = [
+            new_node.type_[i](v) for i, v in enumerate(json.get("VALUE", []))
+            if not (isinstance(v, dict) and not v) and new_node.type_
+        ] if "VALUE" in json and isinstance(json["VALUE"], list) else []
 
-        if "DESCRIPTION" in json:
-            new_node.description = json["DESCRIPTION"]
-
-        if "ACCESS" in json:
-            new_node.access = OSCAccess(json["ACCESS"])
-
-        if "VALUE" in json:
-            new_node.value = []
-            # This should always be an array... throw an exception here?
-            if not isinstance(json['VALUE'], list):
-                raise ValueError(
-                    "OSCQuery JSON Value is not List / Array? Out-of-spec?"
-                )
-
-            for idx, v in enumerate(json["VALUE"]):
-                # According to the spec, if there is not yet a value,
-                # the return will be an empty JSON object
-                if isinstance(v, dict) and not v:
-                    # FIXME does this apply to all values in the value array always...? I assume it does here
-                    new_node.value = []
-                    break
-                else:
-                    new_node.value.append(new_node.type_[idx](v))
+        # # FIXME does this apply to all values in the value array always...? I assume it does here
+        # This comment is a carry over addressing the "isinstance(v, dict) and not v"
+        # The line, I assume, is correct. As I haven't encountered an issue with it yet.
+        # Further testing may be needed to confirm it always applies.
 
         return new_node
 
